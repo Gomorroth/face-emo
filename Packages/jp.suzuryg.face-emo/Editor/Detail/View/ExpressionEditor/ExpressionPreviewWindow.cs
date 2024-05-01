@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using UnityEngine;
 using UnityEditor;
@@ -62,7 +62,7 @@ namespace Suzuryg.FaceEmo.Detail.View
             drawGizmos = false;
             const float initialZoom = 0.12f;
             LookAt(point: _expressionEditor.GetAvatarViewPosition(),
-                direction: Quaternion.Euler(-5, 180, 0), newSize: initialZoom, ortho: false, instant: true);
+                direction: Quaternion.Euler(-5, 180, 0), newSize: initialZoom, ortho: true, instant: true);
         }
 
         public override void OnEnable()
