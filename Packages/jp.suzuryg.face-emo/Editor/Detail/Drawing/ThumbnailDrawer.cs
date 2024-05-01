@@ -98,6 +98,7 @@ namespace Suzuryg.FaceEmo.Detail.Drawing
         private Texture2D _hourglassIcon;
         private Texture2D _errorIcon;
         private Scene _previewScene;
+        private AnimationModeDriver driver;
 
         private CompositeDisposable _disposables = new CompositeDisposable();
 
@@ -124,6 +125,8 @@ namespace Suzuryg.FaceEmo.Detail.Drawing
                     }
                 }
             }).AddTo(_disposables);
+            driver = ScriptableObject.CreateInstance<AnimationModeDriver>();
+            Disposable.Create(() => { if (!driver) return; AnimationMode.StopAnimationMode(driver); GameObject.DestroyImmediate(driver); }).AddTo(_disposables);
 
             // Periodic update
             if (this is MainThumbnailDrawer || this is GestureTableThumbnailDrawer)
@@ -201,7 +204,7 @@ namespace Suzuryg.FaceEmo.Detail.Drawing
             // using (_customMarker.Auto()){
 
             // If there is no request for thumbnail generation, it is not executed (does not trigger a GameObject Instantiate).
-            if (!_requests.Any())
+            if (!_requests.Any() || AnimationMode.InAnimationMode())
             {
                 yield break;
             }
@@ -354,7 +357,7 @@ namespace Suzuryg.FaceEmo.Detail.Drawing
             var rotationCache = animatorRoot.transform.rotation;
             try
             {
-                AnimationMode.StartAnimationMode();
+                AnimationMode.StartAnimationMode(driver);
                 AnimationMode.BeginSampling();
                 AnimationMode.SampleAnimationClip(animatorRoot, synthesized, synthesized.length);
                 AnimationMode.EndSampling();
@@ -371,7 +374,7 @@ namespace Suzuryg.FaceEmo.Detail.Drawing
             }
             finally
             {
-                AnimationMode.StopAnimationMode();
+                AnimationMode.StopAnimationMode(driver);
                 animatorRoot.transform.position = positionCache;
                 animatorRoot.transform.rotation = rotationCache;
             }

@@ -10,6 +10,7 @@ using Suzuryg.FaceEmo.Components.Settings;
 using System.Linq;
 using Suzuryg.FaceEmo.Detail.Drawing;
 using Suzuryg.FaceEmo.Detail.Localization;
+using nadena.dev.modular_avatar.core;
 
 namespace Suzuryg.FaceEmo.Detail.AV3
 {
@@ -31,6 +32,7 @@ namespace Suzuryg.FaceEmo.Detail.AV3
         public IReadOnlyDictionary<int, TransformProxy> AnimatedAdditionalTransformsBuffer => _animatedAdditionalTransformsBuffer;
         public IObservable<Unit> OnClipUpdated => _onClipUpdated.AsObservable();
         public bool IsDisposed => _disposables is null || _disposables.IsDisposed;
+        public AnimationModeDriver Driver { get; }
 
         private ISubWindowProvider _subWindowProvider;
         private ILocalizationSetting _localizationSetting;
@@ -72,6 +74,9 @@ namespace Suzuryg.FaceEmo.Detail.AV3
             _aV3Setting = aV3Setting;
             _expressionEditorSetting = expressionEditorSetting;
 
+            Driver = ScriptableObject.CreateInstance<AnimationModeDriver>();
+            Disposable.Create(() => { if (!Driver) return; AnimationMode.StopAnimationMode(Driver); GameObject.DestroyImmediate(Driver); }).AddTo(_disposables);
+
             // Add event handlers
             Undo.undoRedoPerformed += OnUndoRedoPerformed;
 
@@ -82,6 +87,7 @@ namespace Suzuryg.FaceEmo.Detail.AV3
         public void Dispose()
         {
             StopSampling();
+            if (_previewAvatar != null) { UnityEngine.Object.DestroyImmediate(_previewAvatar); }
             Undo.undoRedoPerformed -= OnUndoRedoPerformed;
             _disposables.Dispose();
         }
@@ -129,13 +135,22 @@ namespace Suzuryg.FaceEmo.Detail.AV3
             var avatarRoot = _aV3Setting?.TargetAvatar?.gameObject;
             if (avatarRoot == null) { return; }
 
-            if (_previewAvatar != null) { UnityEngine.Object.DestroyImmediate(_previewAvatar); }
-            _previewAvatar = UnityEngine.Object.Instantiate(avatarRoot);
-            // FIXME: Unable to support the case that avatar's body shape balance is tuned by root object's scale. (Is it necessary to assume this case...?)
-            _previewAvatar.transform.localScale = Vector3.one;
-            _previewAvatar.SetActive(true);
-            _previewAvatar.hideFlags = HideFlags.HideAndDontSave;
+            //if (_previewAvatar != null) { UnityEngine.Object.DestroyImmediate(_previewAvatar); }
+            if (_previewAvatar == null)
+            {
+                _previewAvatar = UnityEngine.Object.Instantiate(avatarRoot);
+                foreach (var x in _previewAvatar.GetComponentsInChildren<MonoBehaviour>())
+                {
+                    // ScaleAdjusterだけ消去したかったけど、なぜか上手く行かなかったので、泣く泣くホワイトリストにしている
+                    if (x is not (VRCAvatarDescriptor or ModularAvatarBoneProxy or ModularAvatarMergeArmature or ModularAvatarBlendshapeSync))
+                        GameObject.DestroyImmediate(x);
+                }
 
+                // FIXME: Unable to support the case that avatar's body shape balance is tuned by root object's scale. (Is it necessary to assume this case...?)
+                _previewAvatar.transform.localScale = Vector3.one;
+                _previewAvatar.SetActive(true);
+                _previewAvatar.hideFlags = HideFlags.HideAndDontSave;
+            }
             // Synthesize preview blend shape
             AnimationClip synthesized;
             if (_previewBlendShape == null)
@@ -152,7 +167,9 @@ namespace Suzuryg.FaceEmo.Detail.AV3
             // Sample
             if (synthesized != null)
             {
-                AnimationMode.StartAnimationMode();
+                if (AnimationMode.InAnimationMode(Driver))
+                    AnimationMode.StopAnimationMode(Driver);
+                AnimationMode.StartAnimationMode(Driver);
                 AnimationMode.BeginSampling();
                 AnimationMode.SampleAnimationClip(_previewAvatar, synthesized, synthesized.length);
                 AnimationMode.EndSampling();
@@ -170,15 +187,15 @@ namespace Suzuryg.FaceEmo.Detail.AV3
             }
             finally
             {
-                if (_previewAvatar != null) { UnityEngine.Object.DestroyImmediate(_previewAvatar); }
-                AnimationMode.StopAnimationMode();
+                AnimationMode.StopAnimationMode(Driver);
             }
         }
 
         public Vector3 GetAvatarViewPosition()
         {
             // Returns view position if previewable in T-pose.
-            if (AV3Utility.GetAvatarPoseClip(_aV3Setting?.TargetAvatar as VRCAvatarDescriptor) != null && (_aV3Setting?.TargetAvatar as VRCAvatarDescriptor)?.GetScaledViewPosition() != null)
+            //if (AV3Utility.GetAvatarPoseClip(_aV3Setting?.TargetAvatar as VRCAvatarDescriptor) != null && (_aV3Setting?.TargetAvatar as VRCAvatarDescriptor)?.GetScaledViewPosition() != null)
+            if ((_aV3Setting?.TargetAvatar as VRCAvatarDescriptor)?.GetScaledViewPosition() != null)
             {
                 return (_aV3Setting.TargetAvatar as VRCAvatarDescriptor).GetScaledViewPosition() + new Vector3(PreviewAvatarPosX, PreviewAvatarPosY, PreviewAvatarPosZ);
             }
@@ -578,11 +595,11 @@ namespace Suzuryg.FaceEmo.Detail.AV3
             try
             {
                 StartSampling();
-                _subWindowProvider.Provide<ExpressionPreviewWindow>()?.UpdateRenderCache();
+                //_subWindowProvider.Provide<ExpressionPreviewWindow>()?.UpdateRenderCache();
             }
             finally
             {
-                StopSampling();
+                //StopSampling();
             }
         }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using UnityEngine;
 using UnityEditor;
@@ -126,13 +126,13 @@ namespace Suzuryg.FaceEmo.Detail.View
         {
             // When the animation changes are saved with Ctrl-S, the AnimationMode is stopped.
             // Therefore, the following process is performed to resume sampling.
-            if (ReferenceEquals(focusedWindow, this) && !AnimationMode.InAnimationMode() && _expressionEditor?.IsDisposed == false)
+            if (ReferenceEquals(focusedWindow, this) && !AnimationMode.InAnimationMode(_expressionEditor.Driver) && _expressionEditor?.IsDisposed == false)
             {
-                _expressionEditor?.StartSampling();
+                //_expressionEditor?.StartSampling();
             }
 
             // If in AnimationMode, draw SceneView.
-            if (AnimationMode.InAnimationMode())
+            if (AnimationMode.InAnimationMode(_expressionEditor.Driver))
             {
 #if UNITY_2019
                 base.OnGUI();
